@@ -42,34 +42,34 @@ font:
 
 # === IMAGES ===
 image:
-  - file: "neutral.png"
+  - file: "images/neutral.png"
     id: img_neutral
     type: RGB565
-  - file: "eyes_closed.png"
+  - file: "images/eyes_closed.png"
     id: img_eyes_closed
     type: RGB565
-  - file: "happy.png"
+  - file: "images/happy.png"
     id: img_happy
     type: RGB565
-  - file: "surprised.png"
+  - file: "images/surprised.png"
     id: img_surprised
     type: RGB565
-  - file: "mouth_closed.png"
+  - file: "images/mouth_closed.png"
     id: img_mouth_closed
     type: RGB565
-  - file: "mouth_open1.png"
+  - file: "images/mouth_open1.png"
     id: img_mouth_open1
     type: RGB565
-  - file: "mouth_open2.png"
+  - file: "images/mouth_open2.png"
     id: img_mouth_open2
     type: RGB565
-  - file: "mouth_open3.png"
+  - file: "images/mouth_open3.png"
     id: img_mouth_open3
     type: RGB565
-  - file: "blush.png"
+  - file: "images/blush.png"
     id: img_blush
     type: RGB565
-  - file: "hearts_small.png"
+  - file: "images/hearts_small.png"
     id: img_hearts
     type: RGB565
 
