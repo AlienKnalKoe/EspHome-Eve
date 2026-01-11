@@ -1,0 +1,319 @@
+esphome:
+  name: eve-robot
+  friendly_name: Eve Robot Girl
+  min_version: 2025.11.0
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# === GLOBALS: Track UI state ===
+globals:
+  - id: question_active
+    type: bool
+    initial_value: 'false'
+
+logger:
+  level: INFO
+api:
+ota:
+  - platform: esphome
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# === FONT ===
+font:
+  - file: "gfonts://Montserrat"
+    id: robot_font
+    size: 30
+    glyphs: ' !"%()+=,-_./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzéëè'
+
+# === IMAGES ===
+image:
+  - file: "neutral.png"
+    id: img_neutral
+    type: RGB565
+  - file: "eyes_closed.png"
+    id: img_eyes_closed
+    type: RGB565
+  - file: "happy.png"
+    id: img_happy
+    type: RGB565
+  - file: "surprised.png"
+    id: img_surprised
+    type: RGB565
+  - file: "mouth_closed.png"
+    id: img_mouth_closed
+    type: RGB565
+  - file: "mouth_open1.png"
+    id: img_mouth_open1
+    type: RGB565
+  - file: "mouth_open2.png"
+    id: img_mouth_open2
+    type: RGB565
+  - file: "mouth_open3.png"
+    id: img_mouth_open3
+    type: RGB565
+  - file: "blush.png"
+    id: img_blush
+    type: RGB565
+  - file: "hearts_small.png"
+    id: img_hearts
+    type: RGB565
+
+# === HARDWARE ===
+output:
+  - platform: ledc
+    id: backlight_pwm
+    pin: GPIO38
+    frequency: 5000Hz
+
+light:
+  - platform: monochromatic
+    name: "Brightness"
+    id: display_backlight
+    output: backlight_pwm
+    restore_mode: ALWAYS_ON
+
+spi:
+  - id: display_init_spi
+    interface: software
+    clk_pin: GPIO48
+    mosi_pin: GPIO47
+    miso_pin: GPIO41
+
+display:
+  - platform: mipi_rgb
+    model: GUITION-4848S040
+    id: my_display
+    spi_id: display_init_spi
+    update_interval: never
+    auto_clear_enabled: false
+    rotation: 90 
+
+i2c:
+  - id: i2c_bus
+    sda: GPIO19
+    scl:
+      number: GPIO45
+      ignore_strapping_warning: true
+
+touchscreen:
+  - platform: gt911
+    id: gt911_touch
+    display: my_display
+    i2c_id: i2c_bus
+    address: 0x5D
+    on_touch:
+      - if:
+          condition:
+            # Tickle only if NO question is active
+            lambda: 'return !id(question_active);'
+          then:
+            - if:
+                condition:
+                  script.is_running: eve_talks
+                then:
+                  - script.stop: eve_talks
+            - lvgl.widget.hide: speech_bubble
+            - script.execute:
+                id: eve_talks
+                message: "Hey! That tickles!"
+                duration_ms: 2500
+                use_happy_face: true
+
+# === LVGL UI ===
+lvgl:
+  buffer_size: 40%
+  color_depth: 16
+  pages:
+    - id: main_robot
+      widgets:
+        - image:
+            id: face
+            src: img_neutral
+            align: CENTER
+        
+        - obj:
+            id: speech_bubble
+            width: 380
+            height: 100
+            align: TOP_MID
+            y: 20
+            hidden: true
+            bg_color: 0xFFFFFF
+            radius: 20
+            border_width: 3
+            widgets:
+              - label:
+                  id: speech_text
+                  text: ""
+                  align: CENTER
+                  width: 340
+                  text_font: robot_font
+
+        - button:
+            id: btn_yes
+            width: 130
+            height: 60
+            align: BOTTOM_RIGHT
+            x: -20
+            y: -20
+            hidden: true
+            bg_color: 0x4CAF50
+            widgets:
+              - label: {text: "YES", align: CENTER}
+            on_click:
+              - script.execute:
+                  id: handle_choice
+                  choice: true
+
+        - button:
+            id: btn_no
+            width: 130
+            height: 60
+            align: BOTTOM_LEFT
+            x: 20
+            y: -20
+            hidden: true
+            bg_color: 0xF44336
+            widgets:
+              - label: {text: "NO", align: CENTER}
+            on_click:
+              - script.execute:
+                  id: handle_choice
+                  choice: false
+
+# === SCRIPTS ===
+script:
+  # Process choice (stops question timeout)
+  - id: handle_choice
+    parameters:
+      choice: bool
+    mode: restart
+    then:
+      - script.stop: eve_ask_question
+      - globals.set: { id: question_active, value: 'false' }
+      - lvgl.widget.hide: btn_yes
+      - lvgl.widget.hide: btn_no
+      - if:
+          condition:
+            lambda: 'return choice;'
+          then:
+            - script.execute:
+                id: eve_talks
+                message: "Great! Want to play Hangman?"
+                duration_ms: 3000
+                use_happy_face: true
+          else:
+            - script.execute:
+                id: eve_talks
+                message: "Okay, maybe later..."
+                duration_ms: 2000
+                use_happy_face: false
+
+  # Ask a question with an 8-second timeout
+  - id: eve_ask_question
+    parameters:
+      question: string
+    mode: restart
+    then:
+      - globals.set: { id: question_active, value: 'true' }
+      - lvgl.label.update:
+          id: speech_text
+          text: !lambda 'return question.c_str();'
+      - lvgl.widget.show: speech_bubble
+      - lvgl.widget.show: btn_yes
+      - lvgl.widget.show: btn_no
+      - lvgl.image.update: { id: face, src: img_surprised }
+      # Wait 8 seconds for answer
+      - delay: 8s
+      # If we reach here without handle_choice stopping the script: cleanup
+      - lvgl.widget.hide: btn_yes
+      - lvgl.widget.hide: btn_no
+      - lvgl.widget.hide: speech_bubble
+      - lvgl.image.update: { id: face, src: img_neutral }
+      - globals.set: { id: question_active, value: 'false' }
+
+  # Standard talking animation
+  - id: eve_talks
+    parameters:
+      message: string
+      duration_ms: int
+      use_happy_face: bool
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return use_happy_face;'
+          then:
+            - lvgl.image.update: { id: face, src: img_happy }
+          else:
+            - lvgl.image.update: { id: face, src: img_neutral }
+      
+      - lvgl.label.update:
+          id: speech_text
+          text: !lambda 'return message.c_str();'
+      - lvgl.widget.show: speech_bubble
+      
+      - while:
+          condition:
+            lambda: |-
+              static uint32_t start_t = 0;
+              if (start_t == 0) start_t = millis();
+              if (millis() - start_t > (uint32_t)duration_ms) {
+                start_t = 0;
+                return false;
+              }
+              return true;
+          then:
+            - lvgl.image.update: { id: face, src: img_mouth_open1 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_open2 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_open3 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_closed }
+            - delay: 150ms
+
+      - lvgl.widget.hide: speech_bubble
+      - lvgl.image.update: { id: face, src: img_neutral }
+
+# === AUTOMATIONS ===
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              static uint32_t last_blink = 0;
+              uint32_t now = millis();
+              if (now - last_blink < 4000) return false;
+              if (now - last_blink > 9000) { last_blink = now; return true; }
+              return (rand() % 100) < 20;
+          then:
+            - lvgl.image.update: { id: face, src: img_eyes_closed }
+            - delay: 140ms
+            - lvgl.image.update: { id: face, src: img_neutral }
+
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            lambda: 'return (rand() % 100) < 25;'
+          then:
+            - script.execute:
+                id: eve_ask_question
+                question: "Shall we do something?"
