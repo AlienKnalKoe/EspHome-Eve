@@ -1,0 +1,74 @@
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+
+
+# === GLOBALS ===
+spi:
+  - id: display_init_spi
+    interface: software
+    clk_pin: GPIO48
+    mosi_pin: GPIO47
+    miso_pin: GPIO41
+    #interface: software
+
+i2c:
+  - id: i2c_bus
+    sda: GPIO19
+    scl:
+      number: GPIO45
+      ignore_strapping_warning: true
+
+display:
+  - platform: mipi_rgb
+    model: GUITION-4848S040
+    id: my_display
+    spi_id: display_init_spi
+    update_interval: never
+    auto_clear_enabled: false
+    rotation: 90 
+
+touchscreen:
+  - platform: gt911
+    id: gt911_touch
+    display: my_display
+    i2c_id: i2c_bus
+    address: 0x5D
+    transform:
+      swap_xy: true
+      mirror_x: true
+      mirror_y: false
+    on_touch:
+      then:
+        - light.turn_on:
+            id: display_backlight
+            brightness: 100%
+        - script.execute: idle_dimmer_script
+
+# === HARDWARE: SD CARD (SPI MODE) ===
+output:
+  - platform: ledc
+    id: backlight_pwm
+    pin: GPIO38
+    frequency: 12000Hz
+    min_power: 0.08
+
+light:
+  - platform: monochromatic
+    name: "Brightness"
+    id: display_backlight
+    output: backlight_pwm
+    restore_mode: ALWAYS_ON
+

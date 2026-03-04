@@ -1,0 +1,24 @@
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# === FONT ===
+api:
+ota:
+  - platform: esphome
+logger:
+  level: INFO
+sensor:
+  - platform: template
+    name: "SD Card Controller"
+    id: sd_status
+    lambda: |-
+      static SDCustom* my_sd = nullptr;
+      if (my_sd == nullptr) {
+          my_sd = new SDCustom();
+          my_sd->setup();
+      }
+      return 1.0; 
+    update_interval: never # We only want it to run once at boot
+
+# === LVGL UI ===

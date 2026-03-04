@@ -1,0 +1,235 @@
+script:
+  - id: handle_choice
+    parameters:
+      choice: bool
+    mode: restart
+    then:
+      - script.stop: eve_ask_question
+      - globals.set: { id: question_active, value: 'false' }
+      - lvgl.widget.hide: btn_yes
+      - lvgl.widget.hide: btn_no
+      - if:
+          condition:
+            lambda: 'return choice;'
+          then:
+            - script.execute:
+                id: eve_talks
+                message: "Great! Let's play!"
+                duration_ms: 2000
+                use_happy_face: true
+            - delay: 2.1s
+            - script.execute: start_hangman
+          else:
+            - script.execute:
+                id: eve_talks
+                message: "Maybe later then!"
+                duration_ms: 2000
+                use_happy_face: false
+
+  - id: start_hangman
+    then:
+      - globals.set: { id: game_active, value: 'true' }
+      - globals.set: { id: mistake_count, value: '0' }
+      - lvgl.label.update: { id: hangman_visual, text: "" }
+      - lambda: |-
+          std::vector<std::string> words = {"ROBOT", "HAPPY", "CHIP", "SCREEN", "TALK", "SURPRISE", "LOVE", "ANGRY", "MINI", "ESPRESSO", "PYTHON", "CODE", "DISPLAY", "BUTTON", "SENSOR", "WIFI", "HOME", "FUTURE", "TECH", "GADGET"};
+          std::string picked = words[rand() % words.size()];
+          id(current_word) = picked;
+          std::string hidden = "";
+          for(char& c : picked) hidden += "_ ";
+          id(display_word) = hidden;
+      - lvgl.label.update:
+          id: word_label
+          text: !lambda 'return id(display_word).c_str();'
+      - lvgl.page.show: game_page
+
+  - id: process_guess
+    parameters:
+      guess: string
+    then:
+      - lambda: |-
+          std::string picked = id(current_word);
+          std::string current_display = id(display_word);
+          char input = std::toupper(guess[0]);
+          bool found = false;
+          
+          for (size_t i = 0; i < picked.length(); i++) {
+            if (picked[i] == input) {
+              current_display[i * 2] = input;
+              found = true;
+            }
+          }
+          id(display_word) = current_display;
+          
+          if (!found) {
+            id(mistake_count)++;
+            lv_img_set_src(id(mini_face), id(img_mini_neutral).get_lv_img_dsc());
+            
+            // Stages with proper C++ escaping for backslashes
+            const char* stages[] = {
+            " ____\n |      \n |       \n_|_",
+            " ____\n | ỏ   \n |       \n_|_",
+            " ____\n |\\ỏ   \n |       \n_|_",
+            " ____\n |\\ỏ/  \n |       \n_|_",
+            " ____\n |\\ỏ/  \n |  |    \n_|_",
+            " ____\n |\\ỏ/  \n |  |    \n_|_/",
+            " ____\n |\\ỏ/  \n |  |    \n_|_/\"
+          };
+            if(id(mistake_count) <= 6) {
+              lv_label_set_text(id(hangman_visual), stages[id(mistake_count)]);
+            }
+          } else {
+            lv_img_set_src(id(mini_face), id(img_mini_neutral).get_lv_img_dsc());
+          }
+      - lvgl.label.update:
+          id: word_label
+          text: !lambda 'return id(display_word).c_str();'
+      - delay: 800ms
+      - lvgl.image.update: { id: mini_face, src: img_mini_neutral }
+      - if:
+          condition:
+            lambda: |-
+              bool win = (id(display_word).find('_') == std::string::npos);
+              bool loss = (id(mistake_count) >= 6);
+              
+              if (win || loss) {
+                id(game_active) = false;
+                std::string msg = loss ? ("The word was: " + id(current_word)) : "You Won!";
+                
+                // Show final word and reveal the Play Again button
+                lv_label_set_text(id(word_label), msg.c_str());
+                lv_obj_clear_flag(id(hangman_restart_btn), LV_OBJ_FLAG_HIDDEN);
+                
+                id(eve_talks)->execute(msg + ". Play again?", 5000, win);
+                return true; // Condition MET - triggers 'then'
+              }
+              return false; // Condition NOT met
+          then:
+            - delay: 8s
+            - lvgl.page.show: main_robot
+
+  - id: start_new_game
+    then:
+      - globals.set: { id: mistake_count, value: '0' }
+      - lvgl.widget.hide: hangman_restart_btn
+      - script.execute: start_hangman # This re-picks a word and resets the UI
+
+  - id: eve_ask_question
+    parameters:
+      question: string
+    mode: restart
+    then:
+      - globals.set: { id: question_active, value: 'true' }
+      - lvgl.label.update:
+          id: speech_text
+          text: !lambda 'return question.c_str();'
+      - lvgl.widget.show: speech_bubble
+      - lvgl.widget.show: btn_yes
+      - lvgl.widget.show: btn_no
+      - lvgl.image.update: { id: face, src: img_surprised }
+      - delay: 8s
+      - if:
+          condition:
+            lambda: 'return id(question_active);'
+          then:
+            - lvgl.widget.hide: btn_yes
+            - lvgl.widget.hide: btn_no
+            - lvgl.widget.hide: speech_bubble
+            - lvgl.image.update: { id: face, src: img_neutral }
+            - globals.set: { id: question_active, value: 'false' }
+
+  - id: eve_talks
+    parameters:
+      message: string
+      duration_ms: int
+      use_happy_face: bool
+    mode: restart
+    then:
+      - if:
+          condition: { lambda: 'return use_happy_face;' }
+          then:
+            - lvgl.image.update: { id: face, src: img_happy }
+          else:
+            - lvgl.image.update: { id: face, src: img_neutral }
+      - lvgl.label.update:
+          id: speech_text
+          text: !lambda 'return message.c_str();'
+      - lvgl.widget.show: speech_bubble
+      - while:
+          condition:
+            lambda: |-
+              static uint32_t start_t = 0;
+              if (start_t == 0) start_t = millis();
+              if (millis() - start_t > (uint32_t)duration_ms) {
+                start_t = 0;
+                return false;
+              }
+              return true;
+          then:
+            - lvgl.image.update: { id: face, src: img_mouth_open1 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_open2 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_open3 }
+            - delay: 150ms
+            - lvgl.image.update: { id: face, src: img_mouth_closed }
+            - delay: 150ms
+      - lvgl.widget.hide: speech_bubble
+      - lvgl.image.update: { id: face, src: img_neutral }
+
+  - id: idle_dimmer_script
+    mode: restart
+    then:
+      - delay: 60s
+      - light.control:
+          id: display_backlight
+          brightness: 10% # Low light (dimmed), not off
+          transition_length: 2s
+      - lvgl.image.update: { id: face, src: img_eyes_closed }
+
+# === AUTOMATIONS ===
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(question_active) && !id(game_active);'
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    static uint32_t last_blink = 0;
+                    uint32_t now = millis();
+                    if (now - last_blink < 4000) return false;
+                    if (now - last_blink > 9000) { last_blink = now; return true; }
+                    return (rand() % 100) < 20;
+                then:
+                  - lvgl.image.update: { id: face, src: img_eyes_closed }
+                  - delay: 140ms
+                  - lvgl.image.update: { id: face, src: img_neutral }
+
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(game_active) && (rand() % 100) < 25;'
+          then:
+            - script.execute:
+                id: eve_ask_question
+                question: "Shall we play a game?"globals:
+  - id: question_active
+    type: bool
+    initial_value: 'false'
+  - id: game_active
+    type: bool
+    initial_value: 'false'
+  - id: current_word
+    type: std::string
+    initial_value: '""'
+  - id: display_word
+    type: std::string
+    initial_value: '""'
+  - id: mistake_count
+    type: int
+    initial_value: '0'
+
