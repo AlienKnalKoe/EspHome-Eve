@@ -1,4 +1,4 @@
-name: ESPHome Config Validation
+name: ESPHome Eve Validation
 
 on:
   push:
@@ -12,9 +12,15 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
-      - name: ESPHome Validate
-        uses: esphome/build-action@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          yaml_file: eve.yaml
-          version: latest
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Validate Eve
+        run: esphome config eve.yaml
