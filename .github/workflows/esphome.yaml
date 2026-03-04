@@ -1,19 +1,20 @@
 name: ESPHome Config Validation
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: ESPHome Validate
-        uses: esphome/build-action@v2
-        with:
-          config_file: eve.yaml
-          version: latest
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: ESPHome Validate
+        uses: esphome/build-action@v3
+        with:
+          yaml_file: eve.yaml
+          version: latest
