@@ -1,4 +1,3 @@
-yaml
 name: ESPHome Config Validation
 
 on:
