@@ -73,7 +73,7 @@ script:
             " ____\n |\\ỏ/  \n |       \n_|_",
             " ____\n |\\ỏ/  \n |  |    \n_|_",
             " ____\n |\\ỏ/  \n |  |    \n_|_/",
-            " ____\n |\\ỏ/  \n |  |    \n_|_/\"
+            " ____\n |\\ỏ/  \n |  |    \n_|_/\\"
           };
             if(id(mistake_count) <= 6) {
               lv_label_set_text(id(hangman_visual), stages[id(mistake_count)]);
@@ -216,7 +216,9 @@ interval:
           then:
             - script.execute:
                 id: eve_ask_question
-                question: "Shall we play a game?"globals:
+                question: "Shall we play a game?"
+
+globals:
   - id: question_active
     type: bool
     initial_value: 'false'

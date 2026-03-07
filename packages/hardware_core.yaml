@@ -36,7 +36,7 @@ display:
     model: GUITION-4848S040
     id: my_display
     spi_id: display_init_spi
-    update_interval: never
+    update_interval: 16ms
     auto_clear_enabled: false
     rotation: 90 
 

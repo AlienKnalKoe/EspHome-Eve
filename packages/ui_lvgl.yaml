@@ -118,17 +118,10 @@ lvgl:
             y: 0
             width: 250
             height: 50
-            widgets: [{label: {text: "View SD Files"}}]
-            on_click:
-              - lvgl.page.show: sd_list_page
-              - lambda: |-
-                  // 1. Get the list from our driver
-                  // We cast the sensor to our SDCustom class
-                  auto* controller = (SDCustom*)id(sd_status);
-                  std::string files = controller->get_file_list();
-                  
-                  // 2. THE FIX: No type names (like lv_obj_t), just the IDs
-                  lv_label_set_text(id(file_list_label), files.c_str());
+            widgets: [{label: {text: "SD disabled"}}]
+            #on_click:
+            #  - lvgl.page.show: sd_list_page
+            #  - lambda: |-
 
         - button:
             width: 200
